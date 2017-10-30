@@ -24,12 +24,12 @@ def addOffset(data, offset):
     Parameters
     ----------
     data : instance of pandas.core.DataFrame
-       Add offset to data.
+        Add offset to data.
     offset : float
         Value of the offset.
 
-    Returns
-    -------
+    Returns:
+
     newData : instance of pandas.core.DataFrame
         The data with offset applied to each electrode.
     """
@@ -53,8 +53,8 @@ def calculateBaseline(data, baselineDur=0.1, fs=2048.):
     fs : float
         Sampling frequency of data in Hz.
 
-    Returns
-    -------
+    Returns:
+
     baseline : float
         The baseline value.
     """
@@ -89,8 +89,8 @@ def chebyBandpassFilter(data, cutoff, gstop=40, gpass=1, fs=2048.):
     gpass : int
         The maximum loss in the passband (dB).
 
-    Returns
-    -------
+    Returns:
+
     filteredData : instance of numpy.array | instance of pandas.core.DataFrame
         The filtered data.
     """
@@ -139,8 +139,8 @@ def checkPlots(data1, data2, fs1, fs2, start, end, electrodeNum):
     electrodeNum : int
         Index of the column to plot.
 
-    Returns
-    -------
+    Returns:
+
     fig : instance of matplotlib.figure.Figure
         The figure containing both dataset plots.
     """
@@ -182,8 +182,8 @@ def checkPlotsNP(data1, data2, fs1, fs2, start, end, electrodeNum):
     electrodeNum : int
         Index of the column to plot.
 
-    Returns
-    -------
+    Returns:
+
     fig : instance of matplotlib.figure.Figure
         The figure containing both dataset plots.
     """
@@ -215,8 +215,8 @@ def computeFFT(data, fs):
     fs : float
         Sampling frequency in Hz.
 
-    Returns
-    -------
+    Returns:
+
     fAx : instance of numpy.array
         Axis in Hz to plot the FFT.
     fftData : instance of numpy.array
@@ -245,8 +245,8 @@ def computePickEnergy(data, pickFreq, showPlot, fs):
     fs : float
         Sampling frequency in Hz.
 
-    Returns
-    -------
+    Returns:
+
     pickRatio : float
         Relative energy of the pick.
     """
@@ -319,8 +319,8 @@ def createStimChannel(events):
         Dataframe containing list of events obtained with mne.find_events(raw)
        .
 
-    Returns
-    -------
+    Returns:
+
     stim : instance of pandas.core.series.Series
         Series containing the stimulus channel reconstructed from events.
     """
@@ -346,8 +346,8 @@ def discriminateEvents(events, threshold):
         Time threshold in milliseconds. Keeps an event if the time difference
         with the next one is superior than threshold.
 
-    Returns
-    -------
+    Returns:
+
     newData : instance of pandas.series.Series
         List of trial number filling the requirements.
     """
@@ -375,8 +375,8 @@ def downsample(data, oldFS, newFS):
     newFS : float
         The new sampling frequency.
 
-    Returns
-    -------
+    Returns:
+
     newData : instance of pandas.DataFrame
         The downsampled dataset.
     """
@@ -399,8 +399,8 @@ def downsampleEvents(events, oldFS, newFS):
     newFS : float
         The sampling frequency to the output events.
 
-    Returns
-    -------
+    Returns:
+
     newEvents : instance of pandas.DataFrame
         DataFrame containing the downsampled events.
     """
@@ -423,8 +423,8 @@ def downsampleNP(data, oldFS, newFS):
     newFS : float
         The new sampling frequency.
 
-    Returns
-    -------
+    Returns:
+
     newData : instance of pandas.DataFrame
         The downsampled dataset.
     """
@@ -435,6 +435,8 @@ def downsampleNP(data, oldFS, newFS):
 
 def FFTTrials(data, events, trialNumList, baselineDur, trialDur, fs, normalize,
     electrodes):
+    """
+    """
     dataElectrodes = np.zeros((5171, len(electrodes)))
     countEle = 0
     for electrode in electrodes:
@@ -467,8 +469,8 @@ def getBehaviorData(dbAddress, dbName, sessionNum):
     sessionNum : int
         Behavior data will be fetched from this sessionNum.
 
-    Returns
-    -------
+    Returns:
+
     lookupTable : instance of pandas.core.DataFrame
         A dataframe containing trial data.
     """
@@ -542,8 +544,8 @@ def getEvents(raw, eventCode):
         device, the triggers are coded 65284, 65288 and 65296 respectively on
         the first, second and third channel.
 
-    Returns
-    -------
+    Returns:
+
     startEvents : instance of pandas.core.DataFrame
         Dataframe containing the list of timing corresponding to the event code
         in the first column. The second column contains the code before the event
@@ -585,8 +587,8 @@ def getTrialsAverage(data, events, trialDur=None, trialNumList=None,
     fs : float
         Sampling frequency of data in Hz.
 
-    Returns
-    -------
+    Returns:
+
     meanTrials : instance of pandas.series.Series
         Series containing the averaged values across trials.
     allTrials : instance of pandas.core.DataFrame
@@ -649,8 +651,8 @@ def getTrialData(data, events, trialNum=0, electrode=None, baselineDur=0.1,
     fs : float
         Sampling frequency of data in Hz.
 
-    Returns
-    -------
+    Returns:
+
     dataElectrode : instance of pandas.core.DataFrame
         Dataframe containing 1 trial from `data` for every or 1 electrode.
 
@@ -716,8 +718,8 @@ def getTrialNumList(table, **kwargs):
         Array containing element from table to select. It can be `SOA`, `SNR` or
         `targetFreq`.
 
-    Returns
-    -------
+    Returns:
+
     newData : instance of pandas.series.Series
         List of trial number filling the requirements.
     """
@@ -755,8 +757,8 @@ def loadEEG(path):
     path : str | array-like of str
         Path to the .bdf file(s) to load.
 
-    Returns
-    -------
+    Returns:
+
     raw : instance of mne.io.edf.edf.RawEDF
         RawEDF object from the MNE library containing data from the .bdf files.
     """
@@ -788,8 +790,8 @@ def normalizeFromBaseline(data, baselineDur=0.1, fs=2048.):
     fs : float
         Sampling frequency of data in Hz.
 
-    Returns
-    -------
+    Returns:
+
     normalized : instance of pandas.core.DataFrame
         The normalized data.
     """
@@ -851,8 +853,8 @@ def plotDataSubset(data, stim, events, offset, t0=0, t1=1, fs=2048.):
     fs : float
         Sampling frequency of data in Hz.
 
-    Returns
-    -------
+    Returns:
+
     fig : instance of matplotlib.figure.Figure
         The figure of the data subset in the time domain.
     """
@@ -921,8 +923,8 @@ def plotERPElectrodes(data, trialNumList, events, trialDur=None, fs=2048.,
     facet : bool, default to False
         If True, each electrode will be plotted on a different facet.
 
-    Returns
-    -------
+    Returns:
+
     fig : instance of matplotlib.figure.Figure
         The figure of the ERP.
     """
@@ -969,8 +971,8 @@ def plotFFT(data, facet=False, freqMin=None, freqMax=None, yMin=None,
     fs : float
         Sampling frequency of data in Hz.
 
-    Returns
-    -------
+    Returns:
+
     fig : instance of matplotlib.figure.Figure
         The figure of the FFT.
     """
@@ -1041,8 +1043,8 @@ def plotFFTElectrodes(data, trialNumList, events, trialDur, fs,
     yMax : float, default to None
         Maximum value (y-axis) to show on the plot.
 
-    Returns
-    -------
+    Returns:
+
     fig : instance of matplotlib.figure.Figure
         The figure of the FFT.
     """
@@ -1086,8 +1088,8 @@ def plotFilterResponse(zpk, fs):
     fs : float
         Sampling frequency in Hz.
 
-    Returns
-    -------
+    Returns:
+
     fig : instance of matplotlib.figure.Figure
         The figure of the filter response.
     """
@@ -1122,8 +1124,8 @@ def refToMastoids(data, M1, M2):
     M2 : instance of pandas.core.series.Series
         Values of mastoid 2. This Series has to be the same length as data
 
-    Returns
-    -------
+    Returns:
+
     newData : instance of pandas.core.DataFrame
         A dataframe referenced to matoids containing all electrode from which
         we subtract the average of M1 and M2.
@@ -1174,8 +1176,8 @@ def compareTimeBehaviorEEG(dbAddress, dbName, events, startSound, interTrialDur,
     fs: float
         Sampling frequency of `startSound` and `startEvents`.
 
-    Returns
-    -------
+    Returns:
+
     comparisonTable : instance of pandas.core.DataFrame
         A dataframe containing columns ['trialNum', 'trialDur_eeg (ms)',
         'trialDur_behavior (ms)', 'diff (ms)', 'soundStart (ms)',
