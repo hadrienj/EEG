@@ -276,6 +276,8 @@ def computePickEnergy(data, pickFreq, showPlot, fs):
     return pickRatio
 
 def create3DMatrix(data, trialTable, events, trialList, fs):
+    """
+    """
     trials = trialTable.copy()
     trials = trials[trials['trialNum'].isin(trialList)]
     totalTrialNum = np.max(trials['trialNum'])
@@ -677,7 +679,9 @@ def getTrialData(data, events, trialNum=0, electrode=None, baselineDur=0.1,
 
 def getTrialDataNP(data, events, trialNum=0, electrode=None, baselineDur=0.1,
     trialDur=None, fs=2048., startOffset=0):
-    # See getTrialData
+    """
+    See getTrialData
+    """
     baselineDurSamples = int(np.round(baselineDur * fs))
     startOffsetSamples = int(np.round(startOffset * fs))
     start = events[0][trialNum]-baselineDurSamples+startOffsetSamples
@@ -730,7 +734,9 @@ def getTrialNumList(table, **kwargs):
         return table.trialNum
 
 def importH5(name, df):
-    f = h5py.File(name,'r') 
+    """
+    """
+    f = h5py.File(name,'r')
     data = f.get(df)
 
     data = np.array(data)
@@ -794,6 +800,8 @@ def normalizeFromBaseline(data, baselineDur=0.1, fs=2048.):
     return normalized
 
 def plot3DMatrix(data, picks, trialList, average, fs):
+    """
+    """
     dur = 10
     durSamples = int(np.round(dur*fs))
     baselineDur = 0.1
@@ -1053,6 +1061,8 @@ def plotFFTElectrodes(data, trialNumList, events, trialDur, fs,
         yMin=yMin, yMax=yMax, fs=fs)
 
 def plotFFTNP(data, average, fs):
+    """
+    """
     if average:
         data = data.mean(axis=1)
 
@@ -1091,6 +1101,8 @@ def plotFilterResponse(zpk, fs):
     plt.ylabel('Amplitude [dB]')
 
 def refToAverageNP(data):
+    """
+    """
     average = np.mean(data, axis=1)
     print average
     average = average.reshape(average.shape[0], 1)
@@ -1124,6 +1136,8 @@ def refToMastoids(data, M1, M2):
     return newData
 
 def refToMastoidsNP(data, M1, M2):
+    """
+    """
     mastoidsMean = np.mean([M1, M2], axis=0)
     mastoidsMean = mastoidsMean.reshape(mastoidsMean.shape[0], 1)
     print mastoidsMean.shape
@@ -1208,6 +1222,8 @@ def compareTimeBehaviorEEG(dbAddress, dbName, events, startSound, interTrialDur,
     return comparisonTable
 
 def preprocessing(files):
+    """
+    """
     raw = loadEEG(files)
     data = createDataFromRaw(raw)
     print 'keeping eeg...'
@@ -1226,6 +1242,8 @@ def preprocessing(files):
     return raw, data, eegData, stim, startEvents, startSounds
 
 def getBehaviorTables(dbAddress, dbName):
+    """
+    """
     tableHJ1 = getBehaviorData(dbAddress, dbName, sessionNum=141)
 
     # tableHJ2 is in split in two sessions
@@ -1238,6 +1256,8 @@ def getBehaviorTables(dbAddress, dbName):
     return tableHJ1, tableHJ2, tableHJ3
 
 def mergeBehaviorTables(tableHJ1, tableHJ2, tableHJ3):
+    """
+    """
     tableHJ1Temp = tableHJ1.copy()
     tableHJ1Temp['session'] = 1
     # Last trial of first session: trigger but no answer so no behavior response

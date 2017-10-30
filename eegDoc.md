@@ -135,9 +135,6 @@ Returns
 
 The figure containing both dataset plots.
 
-#### `compareTimeBehaviorEEG(dbAddress, dbName, events, startSound, interTrialDur`
-
-
 #### `computeFFT(data, fs)`
 
 Compute the FFT of `data` and return also the axis in Hz for further plot.
@@ -185,37 +182,6 @@ Relative energy of the pick.
 
 #### `create3DMatrix(data, trialTable, events, trialList, fs)`
 
-trials = trials[trials['trialNum'].isin(trialList)]
-totalTrialNum = np.max(trials['trialNum'])
-m = trials.shape[0]
-print m, totalTrialNum
-
-electrodeNumber = data.shape[1]
-trialDur = 10
-baselineDur = 0
-trialSamples = int(np.round((trialDur+baselineDur)*fs))
-# number of features: each sample for each electrode
-n = int(np.round(trialDur*fs*electrodeNumber))
-# Get trial data
-X = np.zeros((m, trialSamples, electrodeNumber))
-
-print 'creating matrix of shape (trials=%d, time=%d, electrodes=%d)' % (X.shape[0],
-                                                                    X.shape[1],
-                                                                    X.shape[2])
-count = 0
-for i in range(totalTrialNum+1):
-# Check if this trial is in our subset
-if (i in trialList.unique()):
-    trial = getTrialDataNP(data.values, events=events,
-                           trialNum=i, baselineDur=baselineDur,
-                           startOffset=0,
-                           trialDur=trialDur, fs=fs)
-    X[count, :, :] = trial
-    count += 1
-print X.shape
-return X
-
-createStimChannel(events):
 
 #### `createStimChannel(events)`
 
@@ -356,41 +322,6 @@ Returns
 
 A dataframe containing trial data.
 
-#### `getBehaviorTables(dbAddress, dbName)`
-
-
-# tableHJ2 is in split in two sessions
-tableHJ2 = getBehaviorData(dbAddress, dbName, sessionNum=144)
-tableHJ2_secondSession = getBehaviorData(dbAddress, dbName, sessionNum=145)
-tableHJ2_secondSession['trialNum'] += 81
-tableHJ2 = tableHJ2.append(tableHJ2_secondSession)
-
-tableHJ3 = getBehaviorData(dbAddress, dbName, sessionNum=147)
-return tableHJ1, tableHJ2, tableHJ3
-
-mergeBehaviorTables(tableHJ1, tableHJ2, tableHJ3):
-tableHJ1Temp = tableHJ1.copy()
-tableHJ1Temp['session'] = 1
-# Last trial of first session: trigger but no answer so no behavior response
-# Add a fake behavioral trial
-lenHJ1 = tableHJ1Temp.shape[0]
-tableHJ1Temp.loc[lenHJ1+1] = [lenHJ1, 0, 0, 0, 1, 0]
-
-tableHJ2Temp = tableHJ2.copy()
-tableHJ2Temp['trialNum'] += lenHJ1 + 1
-tableHJ2Temp['session'] = 2
-
-tableHJ3Temp = tableHJ3.copy()
-tableHJ3Temp['trialNum'] += lenHJ1 + 1 + tableHJ2.shape[0] 
-tableHJ3Temp['session'] = 3
-
-tableAll = tableHJ1Temp.append([tableHJ2Temp, tableHJ3Temp], ignore_index=True)
-tableAll = tableAll.sort_values('trialNum')
-tableAll = tableAll.reset_index(drop=True)
-
-return tableAll
-
-
 #### `getEvents(raw, eventCode)`
 
 Get the events corresponding to `eventCode`.
@@ -412,34 +343,14 @@ Dataframe containing the list of timing corresponding to the event code
 in the first column. The second column contains the code before the event
 and the third the code of the selected event.
 
+#### `getTrialsAverage(data, events, trialDur=None, trialNumList=None`
+
+
 #### `getTrialData(data, events, trialNum=0, electrode=None, baselineDur=0.1`
 
 
 #### `getTrialDataNP(data, events, trialNum=0, electrode=None, baselineDur=0.1`
 
-# See getTrialData
-baselineDurSamples = int(np.round(baselineDur * fs))
-startOffsetSamples = int(np.round(startOffset * fs))
-start = events[0][trialNum]-baselineDurSamples+startOffsetSamples
-if (trialDur is None):
-if (trialNum<events[0].shape[0]-1):
-    end = events[0][trialNum+1]
-else:
-    # arbitrarly set trial duration to 10s for last trial
-    lastTrialDur = int(np.round(10 * fs))
-    end = events[0][trialNum]+lastTrialDur
-else:
-durSamples = int(np.round(trialDur * fs))
-end = events[0][trialNum]+durSamples
-
-if (electrode is None):
-dataElectrode = data[start:end, :]
-else:
-dataElectrode = data[start:end, electrode]
-
-return dataElectrode
-
-getTrialNumList(table, **kwargs):
 
 #### `getTrialNumList(table, **kwargs)`
 
@@ -460,20 +371,8 @@ Returns
 
 List of trial number filling the requirements.
 
-#### `getTrialsAverage(data, events, trialDur=None, trialNumList=None`
-
-
 #### `importH5(name, df)`
 
-data = f.get(df)
-
-data = np.array(data)
-oldShape = data.shape
-data = np.swapaxes(data, 1, 2)
-print 'convert shape %s to %s' % (oldShape, data.shape)
-return data
-
-loadEEG(path):
 
 #### `loadEEG(path)`
 
@@ -489,29 +388,6 @@ Returns
    - **`raw`** `instance of mne.io.edf.edf.RawEDF`
 
 RawEDF object from the MNE library containing data from the .bdf files.
-
-#### `mergeBehaviorTables(tableHJ1, tableHJ2, tableHJ3)`
-
-tableHJ1Temp['session'] = 1
-# Last trial of first session: trigger but no answer so no behavior response
-# Add a fake behavioral trial
-lenHJ1 = tableHJ1Temp.shape[0]
-tableHJ1Temp.loc[lenHJ1+1] = [lenHJ1, 0, 0, 0, 1, 0]
-
-tableHJ2Temp = tableHJ2.copy()
-tableHJ2Temp['trialNum'] += lenHJ1 + 1
-tableHJ2Temp['session'] = 2
-
-tableHJ3Temp = tableHJ3.copy()
-tableHJ3Temp['trialNum'] += lenHJ1 + 1 + tableHJ2.shape[0] 
-tableHJ3Temp['session'] = 3
-
-tableAll = tableHJ1Temp.append([tableHJ2Temp, tableHJ3Temp], ignore_index=True)
-tableAll = tableAll.sort_values('trialNum')
-tableAll = tableAll.reset_index(drop=True)
-
-return tableAll
-
 
 #### `normalizeFromBaseline(data, baselineDur=0.1, fs=2048.)`
 
@@ -538,31 +414,6 @@ The normalized data.
 
 #### `plot3DMatrix(data, picks, trialList, average, fs)`
 
-durSamples = int(np.round(dur*fs))
-baselineDur = 0.1
-baselineDurSamples = int(np.round(baselineDur*fs))
-# subset trials
-dataSub = data[trialList,:,:]
-
-# subset electrodes
-dataSub = dataSub[:,:,picks]
-
-# calculate mean across trials
-print 'Averaging %d trials...' % (dataSub.shape[0])
-dataMean = np.mean(dataSub, axis=0)
-
-#     # plot time sequence
-#     x = np.arange(-baselineDurSamples, durSamples)/fs
-#     plt.figure()
-#     plt.plot(x, dataMean[:durSamples+baselineDurSamples,:])
-#     plt.axvline(x=0)
-#     plt.show()
-#     plt.close()
-
-# plot fft
-plotFFTNP(dataMean, average=average, fs=fs)
-
-plotDataSubset(data, stim, events, offset, t0=0, t1=1, fs=2048.):
 
 #### `plotDataSubset(data, stim, events, offset, t0=0, t1=1, fs=2048.)`
 
@@ -612,18 +463,6 @@ freqMin=None, freqMax=None, yMin=None, yMax=None, startOffset=0, noiseAve=None):
 
 #### `plotFFTNP(data, average, fs)`
 
-data = data.mean(axis=1)
-
-fAx, fftData = computeFFT(data, fs)
-
-plt.figure()
-plt.plot(fAx, fftData, linewidth=0.5)
-plt.xlabel('frequency (Hz)')
-plt.xticks([4, 7, 13, 26])
-plt.xlim(0, 35)
-plt.show()
-
-plotFilterResponse(zpk, fs):
 
 #### `plotFilterResponse(zpk, fs)`
 
@@ -642,67 +481,8 @@ Returns
 
 The figure of the filter response.
 
-#### `preprocessing(files)`
-
-data = createDataFromRaw(raw)
-print 'keeping eeg...'
-# Keep only eeg channels
-eegData = data.iloc[:, 1:65]
-print 'creating stim'
-# add stim channel (named 'STI 014' with biosemi)
-stim = data['STI 014']
-print 'getting events...'
-# Get events
-startEvents = getEvents(raw=raw, eventCode=65284)
-startSound = getEvents(raw=raw, eventCode=65288)
-# Use discriminate events because two types are on the same channel
-startSound = discriminateEvents(startSound, 300)
-
-return raw, data, eegData, stim, startEvents, startSounds
-
-getBehaviorTables(dbAddress, dbName):
-tableHJ1 = getBehaviorData(dbAddress, dbName, sessionNum=141)
-
-# tableHJ2 is in split in two sessions
-tableHJ2 = getBehaviorData(dbAddress, dbName, sessionNum=144)
-tableHJ2_secondSession = getBehaviorData(dbAddress, dbName, sessionNum=145)
-tableHJ2_secondSession['trialNum'] += 81
-tableHJ2 = tableHJ2.append(tableHJ2_secondSession)
-
-tableHJ3 = getBehaviorData(dbAddress, dbName, sessionNum=147)
-return tableHJ1, tableHJ2, tableHJ3
-
-mergeBehaviorTables(tableHJ1, tableHJ2, tableHJ3):
-tableHJ1Temp = tableHJ1.copy()
-tableHJ1Temp['session'] = 1
-# Last trial of first session: trigger but no answer so no behavior response
-# Add a fake behavioral trial
-lenHJ1 = tableHJ1Temp.shape[0]
-tableHJ1Temp.loc[lenHJ1+1] = [lenHJ1, 0, 0, 0, 1, 0]
-
-tableHJ2Temp = tableHJ2.copy()
-tableHJ2Temp['trialNum'] += lenHJ1 + 1
-tableHJ2Temp['session'] = 2
-
-tableHJ3Temp = tableHJ3.copy()
-tableHJ3Temp['trialNum'] += lenHJ1 + 1 + tableHJ2.shape[0] 
-tableHJ3Temp['session'] = 3
-
-tableAll = tableHJ1Temp.append([tableHJ2Temp, tableHJ3Temp], ignore_index=True)
-tableAll = tableAll.sort_values('trialNum')
-tableAll = tableAll.reset_index(drop=True)
-
-return tableAll
-
-
 #### `refToAverageNP(data)`
 
-print average
-average = average.reshape(average.shape[0], 1)
-newData = data - average
-return newData
-
-refToMastoids(data, M1, M2):
 
 #### `refToMastoids(data, M1, M2)`
 
@@ -727,12 +507,14 @@ we subtract the average of M1 and M2.
 
 #### `refToMastoidsNP(data, M1, M2)`
 
-mastoidsMean = mastoidsMean.reshape(mastoidsMean.shape[0], 1)
-print mastoidsMean.shape
-newData = data - mastoidsMean
-return newData
+
+#### `compareTimeBehaviorEEG(dbAddress, dbName, events, startSound, interTrialDur`
 
 
-########## FUNCTIONS FOR THE PILOT SESSION ###################
-compareTimeBehaviorEEG(dbAddress, dbName, events, startSound, interTrialDur,
-sessionNum=None, table=None, fs=2048.):
+#### `preprocessing(files)`
+
+
+#### `getBehaviorTables(dbAddress, dbName)`
+
+
+#### `mergeBehaviorTables(tableHJ1, tableHJ2, tableHJ3)`
