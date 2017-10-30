@@ -1,10 +1,14 @@
-This repository contains a set of functions used to pre-process and process electroencephalogray (EEG) data.
+This repository contains a set of functions to pre-process and process electroencephalogray (EEG) data.
 
 # Introduction
 
+With most recording devices, EEG data are structured as a big matrix of shape (time x electrodes). One electrode channel generaly corresponds to the trigger channel used to synchronise the participant response or the stimuli to the EEG signal. The raw EEG can then be split according to this trigger channel to average EEG signal coming from same condition for instance.
+
+These function can be used to load data, do some kind of processing, plot etc.
+
 # API
 
-# `addOffset(data, offset)`
+### `addOffset(data, offset)`
 
 Plot all electrodes with an offset from t0 to t1. The stimulus channel is
 also ploted and red lines are used to show the events.
@@ -22,7 +26,7 @@ Returns:
 
    The data with offset applied to each electrode.
 
-# `calculateBaseline(data, baselineDur=0.1, fs=2048.)`
+### `calculateBaseline(data, baselineDur=0.1, fs=2048.)`
 
 Calculate and return the baseline (average of each data point) of a signal.
 The baseline will calculated from the first `baselineDur` seconds of this
@@ -45,7 +49,7 @@ Returns:
 
    The baseline value.
 
-# `chebyBandpassFilter(data, cutoff, gstop=40, gpass=1, fs=2048.)`
+### `chebyBandpassFilter(data, cutoff, gstop=40, gpass=1, fs=2048.)`
 
 Design a filter with scipy functions avoiding unstable results (when using
 ab output and filtfilt(), lfilter()...).
@@ -77,7 +81,7 @@ Returns:
 
    The filtered data.
 
-# `checkPlots(data1, data2, fs1, fs2, start, end, electrodeNum)`
+### `checkPlots(data1, data2, fs1, fs2, start, end, electrodeNum)`
 
 Check filtering and downsampling by ploting both datasets.
 
@@ -109,7 +113,7 @@ Returns:
 
    The figure containing both dataset plots.
 
-# `checkPlotsNP(data1, data2, fs1, fs2, start, end, electrodeNum)`
+### `checkPlotsNP(data1, data2, fs1, fs2, start, end, electrodeNum)`
 
 Check filtering and downsampling by ploting both datasets.
 
@@ -141,7 +145,7 @@ Returns:
 
    The figure containing both dataset plots.
 
-# `computeFFT(data, fs)`
+### `computeFFT(data, fs)`
 
 Compute the FFT of `data` and return also the axis in Hz for further plot.
 
@@ -161,7 +165,7 @@ Returns:
 
    Value of the fft.
 
-# `computePickEnergy(data, pickFreq, showPlot, fs)`
+### `computePickEnergy(data, pickFreq, showPlot, fs)`
 
 Calculate the relative energy at the frequency `pickFreq` from the the FFT
 of `data`. Compare the mean around the pick with the mean of a broader zone
@@ -186,10 +190,10 @@ Returns:
 
    Relative energy of the pick.
 
-# `create3DMatrix(data, trialTable, events, trialList, fs)`
+### `create3DMatrix(data, trialTable, events, trialList, fs)`
 
 
-# `createStimChannel(events)`
+### `createStimChannel(events)`
 
 Create stim channel from events.
 
@@ -204,7 +208,7 @@ Returns:
 
    Series containing the stimulus channel reconstructed from events.
 
-# `discriminateEvents(events, threshold)`
+### `discriminateEvents(events, threshold)`
 
 Discriminate triggers when different kind of events are on the same channel.
 A time threshold is used to determine if two events are from the same trial.
@@ -224,7 +228,7 @@ Returns:
 
    List of trial number filling the requirements.
 
-# `downsample(data, oldFS, newFS)`
+### `downsample(data, oldFS, newFS)`
 
 Resample data from oldFS to newFS using the scipy 'resample' function.
 
@@ -244,7 +248,7 @@ Returns:
 
    The downsampled dataset.
 
-# `downsampleEvents(events, oldFS, newFS)`
+### `downsampleEvents(events, oldFS, newFS)`
 
 Modify the timestamps of events to match a new sampling frequency.
 
@@ -265,7 +269,7 @@ Returns:
 
    DataFrame containing the downsampled events.
 
-# `downsampleNP(data, oldFS, newFS)`
+### `downsampleNP(data, oldFS, newFS)`
 
 Resample data from oldFS to newFS using the scipy 'resample' function.
 
@@ -285,10 +289,10 @@ Returns:
 
    The downsampled dataset.
 
-# `FFTTrials(data, events, trialNumList, baselineDur, trialDur, fs, normalize`
+### `FFTTrials(data, events, trialNumList, baselineDur, trialDur, fs, normalize`
 
 
-# `getBehaviorData(dbAddress, dbName, sessionNum)`
+### `getBehaviorData(dbAddress, dbName, sessionNum)`
 
 Fetch behavior data from couchdb (SOA, SNR and trial duration).
 
@@ -308,7 +312,7 @@ Returns:
 
    A dataframe containing trial data.
 
-# `getEvents(raw, eventCode)`
+### `getEvents(raw, eventCode)`
 
 Get the events corresponding to `eventCode`.
 
@@ -329,16 +333,16 @@ Returns:
 in the first column. The second column contains the code before the event
 and the third the code of the selected event.
 
-# `getTrialsAverage(data, events, trialDur=None, trialNumList=None`
+### `getTrialsAverage(data, events, trialDur=None, trialNumList=None`
 
 
-# `getTrialData(data, events, trialNum=0, electrode=None, baselineDur=0.1`
+### `getTrialData(data, events, trialNum=0, electrode=None, baselineDur=0.1`
 
 
-# `getTrialDataNP(data, events, trialNum=0, electrode=None, baselineDur=0.1`
+### `getTrialDataNP(data, events, trialNum=0, electrode=None, baselineDur=0.1`
 
 
-# `getTrialNumList(table, **kwargs)`
+### `getTrialNumList(table, **kwargs)`
 
 Returns a subset of table according to SOA, SNR and/or targetFreq. This is
 used to select trials with specific parameters.
@@ -357,10 +361,10 @@ Returns:
 
    List of trial number filling the requirements.
 
-# `importH5(name, df)`
+### `importH5(name, df)`
 
 
-# `loadEEG(path)`
+### `loadEEG(path)`
 
 Load data from .bdf files. If an array of path is provided, files will be
 concatenated.
@@ -375,7 +379,7 @@ Returns:
 
    RawEDF object from the MNE library containing data from the .bdf files.
 
-# `normalizeFromBaseline(data, baselineDur=0.1, fs=2048.)`
+### `normalizeFromBaseline(data, baselineDur=0.1, fs=2048.)`
 
 Normalize data by subtracting the baseline to each data point. The data used
 to normalize has to be included at the beginning of data. For instance, to
@@ -398,10 +402,10 @@ Returns:
 
    The normalized data.
 
-# `plot3DMatrix(data, picks, trialList, average, fs)`
+### `plot3DMatrix(data, picks, trialList, average, fs)`
 
 
-# `plotDataSubset(data, stim, events, offset, t0=0, t1=1, fs=2048.)`
+### `plotDataSubset(data, stim, events, offset, t0=0, t1=1, fs=2048.)`
 
 Plot all electrodes with an offset from t0 to t1. The stimulus channel is
 also ploted and red lines are used to show the events.
@@ -436,21 +440,21 @@ Returns:
 
    The figure of the data subset in the time domain.
 
-# `plotERPElectrodes(data, trialNumList, events, trialDur=None, fs=2048.`
+### `plotERPElectrodes(data, trialNumList, events, trialDur=None, fs=2048.`
 
 startOffset=0):
 
-# `plotFFT(data, facet=False, freqMin=None, freqMax=None, yMin=None`
+### `plotFFT(data, facet=False, freqMin=None, freqMax=None, yMin=None`
 
 
-# `plotFFTElectrodes(data, trialNumList, events, trialDur, fs`
+### `plotFFTElectrodes(data, trialNumList, events, trialDur, fs`
 
 freqMin=None, freqMax=None, yMin=None, yMax=None, startOffset=0, noiseAve=None):
 
-# `plotFFTNP(data, average, fs)`
+### `plotFFTNP(data, average, fs)`
 
 
-# `plotFilterResponse(zpk, fs)`
+### `plotFilterResponse(zpk, fs)`
 
 Plot the filter frequency response.
 
@@ -467,10 +471,10 @@ Returns:
 
    The figure of the filter response.
 
-# `refToAverageNP(data)`
+### `refToAverageNP(data)`
 
 
-# `refToMastoids(data, M1, M2)`
+### `refToMastoids(data, M1, M2)`
 
 Transform each electrode of data according to the average of M1 and M2.
 
@@ -491,19 +495,19 @@ Returns:
    A dataframe referenced to matoids containing all electrode from which
 we subtract the average of M1 and M2.
 
-# `refToMastoidsNP(data, M1, M2)`
+### `refToMastoidsNP(data, M1, M2)`
 
 
-# `compareTimeBehaviorEEG(dbAddress, dbName, events, startSound, interTrialDur`
+### `compareTimeBehaviorEEG(dbAddress, dbName, events, startSound, interTrialDur`
 
 
-# `preprocessing(files)`
+### `preprocessing(files)`
 
 
-# `getBehaviorTables(dbAddress, dbName)`
+### `getBehaviorTables(dbAddress, dbName)`
 
 
-# `mergeBehaviorTables(tableHJ1, tableHJ2, tableHJ3)`
+### `mergeBehaviorTables(tableHJ1, tableHJ2, tableHJ3)`
 
 
 
