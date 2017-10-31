@@ -237,7 +237,7 @@ def computePickEnergy(data, pickFreq, showPlot, fs):
     Parameters
     ----------
     data : array-like
-        Matrix of the shape (time, electrode).
+        Matrix of shape (time, electrode).
     pickFreq : float
         Frequency in Hz of the pick for which we want to calculate the relative energy.
     showPlot : boolean
@@ -250,15 +250,20 @@ def computePickEnergy(data, pickFreq, showPlot, fs):
     pickRatio : float
         Relative energy of the pick.
     """
+    pickWidth = 1
     N = data.shape[0]
+    # Calculate the FFT of `data`
     fAx, fftData = computeFFT(data, fs)
 
     # Convert pick from Hz to bin number
     pickBin = int(np.round(pickFreq*(N/fs)))
 
-    pickData = fftData[pickBin:pickBin+1]
+    # Extract power at the frequency bin
+    pickData = fftData[pickBin:pickBin+pickWidth]
+    # Average power across time
     pickDataMean = pickData.mean(axis=0)
 
+    # Extract power around the frequency bin
     nonPickBin = np.concatenate([np.arange(pickBin-5, pickBin),
                                 np.arange(pickBin+1, pickBin+5+1)]);
 
@@ -272,8 +277,31 @@ def computePickEnergy(data, pickFreq, showPlot, fs):
         plt.plot(fAx, fftData, linewidth=0.5)
         plt.show()
 
-    # meanColumn = data.mean(axis=0)
     return pickRatio
+
+def covUnnorm(data):
+    """
+    Calculate the unbiased covariance of the the matrix `data`. Covariance in numpy
+    normalize by dividing the dot product by (N-1) where N is the number
+    of samples. The sum across electrodes of the raw (not normalized)
+    covariance is returned.
+
+    Parameters
+    ----------
+    data : array-like
+        3D matrix of shape (trials, time, electrode).
+
+    Returns:
+
+    cov: array-like
+        Covariance matrix of shape (electrode, electrode)
+    """
+    electrodeNum = data.shape[2]
+    trialNum = data.shape[0]
+    cov = np.zeros((electrodeNum, electrodeNum))
+    for i in range(trialNum):
+        cov += np.dot(data[i,:,:].T, data[i,:,:])
+    return cov
 
 def create3DMatrix(data, trialTable, events, trialList, fs):
     """
@@ -1280,3 +1308,8 @@ def mergeBehaviorTables(tableHJ1, tableHJ2, tableHJ3):
     tableAll = tableAll.reset_index(drop=True)
 
     return tableAll
+
+
+
+def test1():
+    print 's'
