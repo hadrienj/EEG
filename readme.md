@@ -1,10 +1,19 @@
-This repository contains a set of functions to pre-process and process electroencephalogray (EEG) data.
+This repository contains a set of functions to pre-process and process electroencephalography (EEG) data.
 
 # Introduction
 
-With most recording devices, EEG data are structured as a big matrix of shape (time x electrodes). One electrode channel generaly corresponds to the trigger channel used to synchronise the participant response or the stimuli to the EEG signal. The raw EEG can then be split according to this trigger channel to average EEG signal coming from same condition for instance.
+With most recording devices, EEG data are structured as a big matrix of shape (time x electrodes). One electrode channel generaly corresponds to the trigger channel used to synchronise the participant response or the stimuli to the EEG signal. The raw EEG can be split in chunks of time according to this trigger channel. It is then possible to average EEG signal coming from same condition for instance.
 
-These function can be used to load data, do some kind of processing, plot etc.
+These functions can be used to load data, do some kind of processing, plot etc.
+
+# Special functions
+
+## Denoising source separation
+
+This denoising method is an implementation of [this matlab toolbox]() created by Alain de Cheveigné. More details about this method can be found in the following papers:
+
+-
+-
 
 # API
 
@@ -513,4 +522,4 @@ we subtract the average of M1 and M2.
 
 # Requirements
 
-It uses some methods of the great [MNE library]() and heavily depends on pandas and numpy.
+It uses some methods of the [MNE library]() and heavily depends on pandas and numpy.

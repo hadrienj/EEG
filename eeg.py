@@ -1,20 +1,14 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.collections import LineCollection
 from pylab import *
 from matplotlib import gridspec
-
 import mne
-from mne import create_info, find_events, Epochs, pick_types
-from mne.time_frequency import tfr_multitaper
-
-from scipy import signal, fftpack
-from scipy.signal import butter, cheby2, filtfilt, resample, lfilter, freqz, freqz_zpk, zpk2sos, sosfilt, sosfiltfilt, cheb2ord
-
+from mne import find_events
+from scipy.signal import resample, freqz_zpk, zpk2sos, sosfiltfilt, cheb2ord, iirdesign
 import couchdb
-
 import h5py
+import time
 
 def addOffset(data, offset):
     """
@@ -36,6 +30,46 @@ def addOffset(data, offset):
 
     newData = data + offset * np.arange(data.shape[1]-1,-1,-1)
     return newData
+
+def applyDSS(data, dss):
+    """
+    Apply the electrodes weights obtained through the Denoising Source Separation
+    (DSS) to the data matrix using dot product.
+
+    Parameters
+    ----------
+    data : array-like
+        2D matrix of shape (time, electrodes) or 3D matrix of shape
+        (trials, time, electrodes).
+    dss : array-like
+        2D matrix of shape (electrodes, electrodes) resulting of the DSS computation.
+        See output of the `computeDSS()` function for more details.
+
+    Returns:
+
+    weightedData : array-like
+        2D matrix of shape (time, electrodes) or 3D matrix of shape
+        (trials, time, electrodes) containing the input data weighted
+        by the matrix dss.
+    """
+    if (np.ndim(data)==2):
+        weightedData = np.dot(data, dss)
+    elif (np.ndim(data)==3):
+        trials = data.shape[0]
+        time = data.shape[1]
+        electrodes = data.shape[2]
+
+        # Reshape data from 3D matrix of shape (trials, time, electrodes) to 2D matrix
+        # of shape (time, electrodes)
+        data2D = data.reshape((trials*time), electrodes)
+
+        weightedData = np.dot(data2D, dss)
+        # Reshape to reconstruct the 3D matrix
+        weightedData = weightedData.reshape(trials, time, electrodes)
+    else:
+        print('data wrong dimensions')
+
+    return weightedData
 
 def calculateBaseline(data, baselineDur=0.1, fs=2048.):
     """
@@ -98,7 +132,7 @@ def chebyBandpassFilter(data, cutoff, gstop=40, gpass=1, fs=2048.):
     wp = [cutoff[1]/(fs/2), cutoff[2]/(fs/2)]
     ws = [cutoff[0]/(fs/2), cutoff[3]/(fs/2)]
 
-    z, p, k = signal.iirdesign(wp = wp, ws= ws, gstop=gstop, gpass=gpass,
+    z, p, k = iirdesign(wp = wp, ws= ws, gstop=gstop, gpass=gpass,
         ftype='cheby2', output='zpk')
     zpk = [z, p, k]
     sos = zpk2sos(z, p, k)
@@ -204,6 +238,40 @@ def checkPlotsNP(data1, data2, fs1, fs2, start, end, electrodeNum):
     plt.plot(x2, data2Sub, alpha=0.7)
     plt.show()
 
+def computeDSS(cov0, cov1):
+    """
+    Compute the Denoising Source Separation (DSS) from unbiased (cov0) and biased (cov1)
+    covariance matrices.
+
+    Parameters
+    ----------
+    cov0 : array-like
+        Covariance matrix of unbiased data.
+    cov1 : array-like
+        Covariance matrix of biased data.
+
+    Returns:
+
+    DSS : array-like
+        Matrix of shape identical to cov0 and cov1 containing the weights that can be
+        applied on data.
+    """
+    # cov0 is the unbiased covariance and cov1 the biased covariance
+    P, D = PCAFromCov(cov0)
+    D = np.abs(D)
+
+    # whiten
+    N = np.diag(np.sqrt(1./D))
+    c2 = N.T.dot(P.T).dot(cov1).dot(P).dot(N)
+
+    Q, eigenVals2 = PCAFromCov(c2)
+    eigenVals2 = np.abs(eigenVals2)
+
+    W = P.dot(N).dot(Q)
+    N2=np.diag(W.T.dot(cov0).dot(W))
+    W=W.dot(np.diag(1./sqrt(N2)))
+    return W
+
 def computeFFT(data, fs):
     """
     Compute the FFT of `data` and return also the axis in Hz for further plot.
@@ -281,7 +349,7 @@ def computePickEnergy(data, pickFreq, showPlot, fs):
 
 def covUnnorm(data):
     """
-    Calculate the unbiased covariance of the the matrix `data`. Covariance in numpy
+    Calculate the unnormalized covariance of the the matrix `data`. Covariance in numpy
     normalize by dividing the dot product by (N-1) where N is the number
     of samples. The sum across electrodes of the raw (not normalized)
     covariance is returned.
@@ -289,12 +357,12 @@ def covUnnorm(data):
     Parameters
     ----------
     data : array-like
-        3D matrix of shape (trials, time, electrode).
+        3D matrix of shape (trials, time, electrodes).
 
     Returns:
 
     cov: array-like
-        Covariance matrix of shape (electrode, electrode)
+        Covariance matrix of shape (electrodes, electrodes)
     """
     electrodeNum = data.shape[2]
     trialNum = data.shape[0]
@@ -359,6 +427,53 @@ def createStimChannel(events):
     chan[newEvents.iloc[:-2, 0]] = 8
     stim = pd.Series(chan, columns = ['STI 014'])
     return stim
+
+def crossValidate(data, dataBiased, trialTable):
+    """
+    Compute DSS from all trials except one and apply it one the one. Do that
+    with all trials as cross validation.
+
+    Parameters
+    ----------
+    data : array-like
+        3D matrix of shape (trials, time, electrodes) containing unbiased data
+    dataBiased : array-like
+        3D matrix of shape (trials, time, electrodes) containing biased data
+        (for instance band-pass filtered)
+
+    Returns:
+
+    allDSS : array-like
+        Matrix of shape identical to dataBiased containing the weighted data
+    """
+    trials = data.shape[0]
+    time = data.shape[1]
+    electrodes = data.shape[2]
+
+    trials4Hz = getTrialNumList(trialTable, noise=[False],
+                                SOA=[4]).astype(int).values
+    trials4HzNum = len(trials4Hz)
+
+    allDSS = np.zeros((trials4HzNum, time, electrodes))
+    for i in range(trials4HzNum-1):
+        # All 4Hz trials except ith
+        trialsToUse4Hz = np.delete(trials4Hz, i)
+        # All trials except ith
+        trialsToUseAll = np.concatenate([np.arange(0,trials4Hz[i]),
+                                         np.arange(trials4Hz[i]+1, trials)])
+
+        # Calculate covariance for unbiased and biased data
+        cov0 = covUnnorm(data[trialsToUseAll,:,:])
+        cov1 = covUnnorm(dataBiased[trials4Hz,:,:])
+
+        DSS = computeDSS(cov0, cov1)
+
+        # Test on ith trial
+        XTest = data[trials4Hz[i],:,:]
+        dataDSS = applyDSS(XTest, DSS)
+        # Push ith trial
+        allDSS[i,:,:] = dataDSS
+    return allDSS
 
 def discriminateEvents(events, threshold):
     """
@@ -444,7 +559,7 @@ def downsampleNP(data, oldFS, newFS):
 
     Parameters
     ----------
-    data : instance of pandas.core.DataFrame
+    data : array-like
         Data to resample.
     oldFS : float
         The sampling frequency of data.
@@ -484,7 +599,64 @@ def FFTTrials(data, events, trialNumList, baselineDur, trialDur, fs, normalize,
         countEle += 1
     return dataElectrodes
 
-def getBehaviorData(dbAddress, dbName, sessionNum):
+def filterAndDownsampleByChunk(raw, fs, newFS, chunkNum=10):
+    """
+    Downsample data. Filters have to be used before downsampling. To be more
+    efficient, the filters and downsampling are applied by chunk of data.
+
+    Parameters
+    ----------
+    raw : instance of mne.io.edf.edf.RawEDF
+        Raw data.
+    fs : float
+        The sampling frequency of data.
+    newFS :
+        The sampling frequency of data after downsampling.
+    chunkNum : int
+        Number of chunk used to process data.
+
+    Returns:
+
+    data : array-like
+        The filtered and downsampled data.
+    """
+    # Calculate the number of sample per chunk
+    subsetLen = int(np.round(len(raw)/float(chunkNum)))
+
+    acc = {}
+    for i in range(chunkNum):
+        tic = time.time()
+        print '...'*chunkNum
+
+        start = subsetLen*i
+        end = subsetLen*(i+1)-1
+
+        # Take part of data
+        eegData = raw[:, start:end][0].T
+
+        zpk, eegData2Hz = chebyBandpassFilter(eegData, [1.8, 2., 30., 35.],
+                                                 gstop=80, gpass=1, fs=fs)
+        eegData2HzNewFS = downsampleNP(eegData2Hz, oldFS=fs, newFS=newFS)
+        acc[i] = eegData2HzNewFS
+
+        toc = time.time()
+        print (str(1000*(toc-tic)))
+
+    # Re concatenate processed data
+    totalSampleNum = int(np.round(len(raw)/fs*newFS))
+    totalChanNum = len(raw.ch_names)
+
+    data = np.zeros((totalSampleNum, totalChanNum))
+
+    subset = totalSampleNum/chunkNum
+    for i in acc:
+        start = subset*i
+        end = subset*(i+1)
+        data[start:end, :] = acc[i]
+        print i, ' done!'
+    return data
+
+def getBehaviorData(dbAddress, dbName, sessionNum, recover=True):
     """
     Fetch behavior data from couchdb (SOA, SNR and trial duration).
 
@@ -506,7 +678,8 @@ def getBehaviorData(dbAddress, dbName, sessionNum):
     couch = couchdb.Server(dbAddress)
     db = couch[dbName]
     lookupTable = pd.DataFrame(columns=['trialNum', 'SOA', 'SNR', 'targetRate',
-        'targetFreq','trialDur', 'soundStart', 'deviant', 'noise'])
+        'targetFreq','trialDur', 'soundStart', 'deviant', 'noise', 'target',
+        'score'])
     count = 0
     for docid in db.view('_all_docs'):
         if (docid['id'].startswith('infMask_%d' % sessionNum)):
@@ -514,7 +687,7 @@ def getBehaviorData(dbAddress, dbName, sessionNum):
 
             trialNum = int(docid['id'].split('_')[-1])
 
-            if (db.get(docid['id'])['toneCloudParam'] is not None):
+            if (db.get(docid['id'])['toneCloudParam'] is not None and recover):
                 doc = pd.DataFrame(db.get(docid['id']))
 
                 toneCloudLen = doc.toneCloudParam.shape[0]
@@ -529,7 +702,7 @@ def getBehaviorData(dbAddress, dbName, sessionNum):
                     targetRate = None
                 targetFreq = doc.targetFreq[0]
                 SNR = doc.targetdB[0]
-                # target SOA can be infered from the number of tone in the cloud
+                # target SOA can be infered from the number of tones in the cloud
                 if (toneCloudLen < 700):
                     recoverTargetSOA = 4
                 elif ((toneCloudLen > 800) & (toneCloudLen < 1100)):
@@ -549,13 +722,15 @@ def getBehaviorData(dbAddress, dbName, sessionNum):
                 soundStart = 0
                 recoverTargetSOA = None
                 recoverNoise = doc.noise
+                target=doc.target
+                score=doc.score
 
 
             lookupTable.loc[count] = pd.Series({'trialNum': trialNum,
                     'SOA': recoverTargetSOA, 'SNR': SNR, 'targetRate': targetRate,
                     'targetFreq': targetFreq, 'trialDur': trialDur,
                     'soundStart': soundStart, 'deviant': deviant,
-                    'noise': recoverNoise})
+                    'noise': recoverNoise, 'target': target, 'score': score})
 
     return lookupTable
 
@@ -712,6 +887,8 @@ def getTrialDataNP(data, events, trialNum=0, electrode=None, baselineDur=0.1,
     """
     See getTrialData
     """
+    if (events[0][trialNum]==None):
+        return
     baselineDurSamples = int(np.round(baselineDur * fs))
     startOffsetSamples = int(np.round(startOffset * fs))
     start = events[0][trialNum]-baselineDurSamples+startOffsetSamples
@@ -828,6 +1005,33 @@ def normalizeFromBaseline(data, baselineDur=0.1, fs=2048.):
     baseline = calculateBaseline(data, baselineDur=baselineDur, fs=fs)
     normalized = data-baseline
     return normalized
+
+def PCAFromCov(cov):
+    """
+    Get PCA components and eignvalues from covariance matrix.
+
+    Parameters
+    ----------
+    cov : array-like
+        Covariance matrix of shape (electrodes, electrodes).
+
+    Returns:
+
+    PCAComp : array-like
+        Matrix of shape (electrodes, electrodes). Columns are the eigenvectors.
+    eigenVals : array-like
+        Matrix of shape (electrodes, 1).
+    """
+
+    # Calculate eigenvectors and eigenvalues
+    eigenVals, eigenVecs = np.linalg.eig(cov)
+    # Get the index of the sorted eigenvalues
+    idx1 = np.argsort(eigenVals.T)[::-1]
+    # Sort the eigenvalues in descending order
+    eigenVals = np.sort(eigenVals.T)[::-1]
+    # Reorder the columns of eigenvectors (the top components are the first columns)
+    PCAComp = eigenVecs[:,idx1]
+    return PCAComp, eigenVals
 
 def plot3DMatrix(data, picks, trialList, average, fs):
     """
@@ -1103,7 +1307,7 @@ def plotFFTNP(data, average, fs):
     plt.xlabel('frequency (Hz)')
     plt.xticks([4, 7, 13, 26])
     plt.xlim(0, 35)
-    plt.show()
+    # plt.show()
 
 def plotFilterResponse(zpk, fs):
     """
@@ -1134,7 +1338,6 @@ def refToAverageNP(data):
     """
     """
     average = np.mean(data, axis=1)
-    print average
     average = average.reshape(average.shape[0], 1)
     newData = data - average
     return newData
@@ -1173,143 +1376,3 @@ def refToMastoidsNP(data, M1, M2):
     print mastoidsMean.shape
     newData = data - mastoidsMean
     return newData
-
-
-############## FUNCTIONS FOR THE PILOT SESSION ###################
-def compareTimeBehaviorEEG(dbAddress, dbName, events, startSound, interTrialDur,
-    sessionNum=None, table=None, fs=2048.):
-    """
-    Compare trial's durations from behavioral data (stored in a couchDB) and
-    from the list of events (extracted from the stim channel). This can be used
-    to assess the triggers accuracy.
-
-    Parameters
-    ----------
-    dbAddress : str
-        Path to the couch database.
-    dbName : str
-        Name of the database on the couch instance.
-    events : instance of pandas.core.DataFrame
-        Dataframe containing the list of events (trial start time) obtained with
-        mne.find_events(raw).
-    startSound : instance of pandas.core.DataFrame
-        Dataframe containing the list of events (sound start time) obtained with
-        mne.find_events(raw).
-    sessionNum : int | None
-        If None table argument has to be provided and will be used as behavior
-        data. Otherwise behavior data will be fetched from this sessionNum.
-    table: pandas DataFrame | None
-        if None sessionNum will be used to fetch behavior data otherwise
-        behavior data is given directly in table.
-    fs: float
-        Sampling frequency of `startSound` and `startEvents`.
-
-    Returns:
-
-    comparisonTable : instance of pandas.core.DataFrame
-        A dataframe containing columns ['trialNum', 'trialDur_eeg (ms)',
-        'trialDur_behavior (ms)', 'diff (ms)', 'soundStart (ms)',
-        'soundStart_eeg (ms)', 'diffSound (ms)'].
-    """
-    if (table is not None):
-        lookupTable = table
-    else:
-        lookupTable = getBehaviorData(dbAddress, dbName, sessionNum)
-    comparisonTable = pd.DataFrame(columns=['trialNum', 'trialDur_eeg',
-        'trialDur_behavior', 'diff', 'soundStart', 'soundStart_eeg', 'diffSound'])
-    eventsCopy = events.reset_index()
-    # go from samples to ms
-    eventsCopy[0] = eventsCopy[0]*1000/fs
-    startSoundCopy = startSound.reset_index()
-    startSoundCopy[0] = startSoundCopy[0]*1000/fs
-    count = 0
-    for i in range(eventsCopy.shape[0]-1):
-        # comparisonTable['trialNum'] = lookupTable['trialNum']
-        trialDur_eeg = (eventsCopy[0][i+1] - eventsCopy[0][i]) - interTrialDur
-        trialDur_behavior = lookupTable['trialDur'][lookupTable['trialNum']==i].iloc[0]
-
-        soundStart = lookupTable['soundStart'][lookupTable['trialNum']==i].iloc[0]*1000
-        # If starting tone cloud is more than 100 ms, the target was the first
-        # sound heard by the participant and it is played 100 ms after the start
-        if (soundStart>100):
-            soundStart = 100
-
-        soundStart_eeg = startSoundCopy[0][i] - eventsCopy[0][i]
-
-        diffSound = np.abs(soundStart_eeg - soundStart)
-
-        diff = np.abs(trialDur_eeg - trialDur_behavior)
-        comparisonTable.loc[count] = pd.Series({'trialNum': i,
-            'trialDur_eeg': trialDur_eeg,
-            'trialDur_behavior': trialDur_behavior, 'diff': diff,
-            'soundStart': soundStart, 'soundStart_eeg': soundStart_eeg,
-            'diffSound': diffSound})
-        count += 1
-
-    comparisonTable.columns = ['trialNum', 'trialDur_eeg (ms)',
-        'trialDur_behavior (ms)', 'diff (ms)', 'soundStart (ms)',
-        'soundStart_eeg (ms)', 'diffSound (ms)']
-    return comparisonTable
-
-def preprocessing(files):
-    """
-    """
-    raw = loadEEG(files)
-    data = createDataFromRaw(raw)
-    print 'keeping eeg...'
-    # Keep only eeg channels
-    eegData = data.iloc[:, 1:65]
-    print 'creating stim'
-    # add stim channel (named 'STI 014' with biosemi)
-    stim = data['STI 014']
-    print 'getting events...'
-    # Get events
-    startEvents = getEvents(raw=raw, eventCode=65284)
-    startSound = getEvents(raw=raw, eventCode=65288)
-    # Use discriminate events because two types are on the same channel
-    startSound = discriminateEvents(startSound, 300)
-
-    return raw, data, eegData, stim, startEvents, startSounds
-
-def getBehaviorTables(dbAddress, dbName):
-    """
-    """
-    tableHJ1 = getBehaviorData(dbAddress, dbName, sessionNum=141)
-
-    # tableHJ2 is in split in two sessions
-    tableHJ2 = getBehaviorData(dbAddress, dbName, sessionNum=144)
-    tableHJ2_secondSession = getBehaviorData(dbAddress, dbName, sessionNum=145)
-    tableHJ2_secondSession['trialNum'] += 81
-    tableHJ2 = tableHJ2.append(tableHJ2_secondSession)
-
-    tableHJ3 = getBehaviorData(dbAddress, dbName, sessionNum=147)
-    return tableHJ1, tableHJ2, tableHJ3
-
-def mergeBehaviorTables(tableHJ1, tableHJ2, tableHJ3):
-    """
-    """
-    tableHJ1Temp = tableHJ1.copy()
-    tableHJ1Temp['session'] = 1
-    # Last trial of first session: trigger but no answer so no behavior response
-    # Add a fake behavioral trial
-    lenHJ1 = tableHJ1Temp.shape[0]
-    tableHJ1Temp.loc[lenHJ1+1] = [lenHJ1, 0, 0, 0, 1, 0]
-
-    tableHJ2Temp = tableHJ2.copy()
-    tableHJ2Temp['trialNum'] += lenHJ1 + 1
-    tableHJ2Temp['session'] = 2
-
-    tableHJ3Temp = tableHJ3.copy()
-    tableHJ3Temp['trialNum'] += lenHJ1 + 1 + tableHJ2.shape[0] 
-    tableHJ3Temp['session'] = 3
-
-    tableAll = tableHJ1Temp.append([tableHJ2Temp, tableHJ3Temp], ignore_index=True)
-    tableAll = tableAll.sort_values('trialNum')
-    tableAll = tableAll.reset_index(drop=True)
-
-    return tableAll
-
-
-
-def test1():
-    print 's'
