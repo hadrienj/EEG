@@ -74,7 +74,7 @@ def applyDSS(data, dss):
 def calculateBaseline(data, baselineDur=0.1, fs=2048.):
     """
     Calculate and return the baseline (average of each data point) of a signal.
-    The baseline will calculated from the first `baselineDur` seconds of this
+    The baseline will be calculated from the first `baselineDur` seconds of this
     signal.
 
     Parameters
@@ -124,6 +124,8 @@ def chebyBandpassFilter(data, cutoff, gstop=40, gpass=1, fs=2048.):
         The maximum loss in the passband (dB).
 
     Returns:
+
+    zpk :
 
     filteredData : instance of numpy.array | instance of pandas.core.DataFrame
         The filtered data.
@@ -371,7 +373,7 @@ def covUnnorm(data):
         cov += np.dot(data[i,:,:].T, data[i,:,:])
     return cov
 
-def create3DMatrix(data, trialTable, events, trialList, fs):
+def create3DMatrix(data, trialTable, events, trialList, trialDur, fs, normalize, baselineDur=0.1):
     """
     """
     trials = trialTable.copy()
@@ -381,16 +383,14 @@ def create3DMatrix(data, trialTable, events, trialList, fs):
     print m, totalTrialNum
 
     electrodeNumber = data.shape[1]
-    trialDur = 10
-    baselineDur = 0
     trialSamples = int(np.round((trialDur+baselineDur)*fs))
     # number of features: each sample for each electrode
     n = int(np.round(trialDur*fs*electrodeNumber))
     # Get trial data
     X = np.zeros((m, trialSamples, electrodeNumber))
 
-    print 'creating matrix of shape (trials=%d, time=%d, electrodes=%d)' % (X.shape[0],
-                                                                            X.shape[1],
+    print 'creating matrix of shape (trials=%d, time=%ds, electrodes=%d)' % (X.shape[0],
+                                                                            X.shape[1]/fs,
                                                                             X.shape[2])
     count = 0
     for i in range(totalTrialNum+1):
@@ -400,9 +400,15 @@ def create3DMatrix(data, trialTable, events, trialList, fs):
                                    trialNum=i, baselineDur=baselineDur,
                                    startOffset=0,
                                    trialDur=trialDur, fs=fs)
+            # Normalization
+            if (normalize):
+                trial = normalizeFromBaseline(trial,
+                                baselineDur=baselineDur, fs=fs)
+
             X[count, :, :] = trial
             count += 1
     print X.shape
+
     return X
 
 def createStimChannel(events):
@@ -734,7 +740,7 @@ def getBehaviorData(dbAddress, dbName, sessionNum, recover=True):
 
     return lookupTable
 
-def getEvents(raw, eventCode):
+def getEvents(raw, eventCode, shortest_event=None):
     """
     Get the events corresponding to `eventCode`.
 
@@ -754,8 +760,11 @@ def getEvents(raw, eventCode):
         in the first column. The second column contains the code before the event
         and the third the code of the selected event.
     """
+    if shortest_event:
+      events = mne.find_events(raw, shortest_event=shortest_event)
+    else:
+      events = mne.find_events(raw)
 
-    events = mne.find_events(raw)
     eventsDf = pd.DataFrame(events)
 
     # Keep only event corresponding to the event code
@@ -1033,11 +1042,11 @@ def PCAFromCov(cov):
     PCAComp = eigenVecs[:,idx1]
     return PCAComp, eigenVals
 
-def plot3DMatrix(data, picks, trialList, average, fs):
+def plot3DMatrix(data, picks, trialList, average, trialDur, offset, normalize, fs):
     """
     """
-    dur = 10
-    durSamples = int(np.round(dur*fs))
+    trialDurSamples = int(np.round(trialDur*fs))
+    offsetSamples = int(np.round(offset*fs))
     baselineDur = 0.1
     baselineDurSamples = int(np.round(baselineDur*fs))
     # subset trials
@@ -1046,9 +1055,18 @@ def plot3DMatrix(data, picks, trialList, average, fs):
     # subset electrodes
     dataSub = dataSub[:,:,picks]
 
+    # subset trialDur
+    dataSub = dataSub[:, offsetSamples:trialDurSamples, :]
+    print dataSub.shape
+
+    # Normalization
+    if (normalize):
+        dataNorm = normalizeFromBaseline(dataSub,
+                        baselineDur=baselineDur, fs=fs)
+
     # calculate mean across trials
-    print 'Averaging %d trials...' % (dataSub.shape[0])
-    dataMean = np.mean(dataSub, axis=0)
+    print 'Averaging %d trials...' % (dataNorm.shape[0])
+    dataMean = np.mean(dataNorm, axis=0)
 
     #     # plot time sequence
     #     x = np.arange(-baselineDurSamples, durSamples)/fs
@@ -1063,7 +1081,7 @@ def plot3DMatrix(data, picks, trialList, average, fs):
 
 def plotDataSubset(data, stim, events, offset, t0=0, t1=1, fs=2048.):
     """
-    Plot all electrodes with an offset from t0 to t1. The stimulus channel is
+    Plot all electrodes from t0 to t1 with an y-axis offset. The stimulus channel is
     also ploted and red lines are used to show the events.
 
     Parameters
@@ -1095,6 +1113,10 @@ def plotDataSubset(data, stim, events, offset, t0=0, t1=1, fs=2048.):
     start = int(np.round(fs*t0))
     end = int(np.round(fs*t1))
     subData = data[start:end]
+
+    # Normalize between 0 and 1
+    subData = (subData-subData.min())/(subData.max()-subData.min())
+
     # spread lines equally on the y-axis
     subData = addOffset(subData, offset=offset)
     stim = stim.iloc[start:end]
@@ -1122,7 +1144,6 @@ def plotDataSubset(data, stim, events, offset, t0=0, t1=1, fs=2048.):
     plt.plot(stim)
     plt.legend(stim.columns, bbox_to_anchor=(1, 1), ncol=4)
     plt.show()
-    plt.close()
 
 def plotERPElectrodes(data, trialNumList, events, trialDur=None, fs=2048.,
     baselineDur=0.1, electrodes='Fp1', normalize=False, facet=False,
@@ -1303,7 +1324,7 @@ def plotFFTNP(data, average, fs):
     fAx, fftData = computeFFT(data, fs)
 
     plt.figure()
-    plt.plot(fAx, fftData, linewidth=0.5)
+    plt.plot(fAx, fftData)
     plt.xlabel('frequency (Hz)')
     plt.xticks([4, 7, 13, 26])
     plt.xlim(0, 35)
@@ -1373,6 +1394,5 @@ def refToMastoidsNP(data, M1, M2):
     """
     mastoidsMean = np.mean([M1, M2], axis=0)
     mastoidsMean = mastoidsMean.reshape(mastoidsMean.shape[0], 1)
-    print mastoidsMean.shape
     newData = data - mastoidsMean
     return newData
