@@ -1236,14 +1236,16 @@ def plotFFT(data, facet=False, freqMin=None, freqMax=None, yMin=None,
     tf = np.linspace(0.0, 1.0/(2.0*Ts), N//2)
     newMeanTrials = 2.0/N * np.abs(data.iloc[0:N//2, :])
     newMeanTrials = newMeanTrials.set_index(tf)
+    xticks = [4, 7, 12, 14, 16, 28, 36, 44, 72, 88, 100]
     if (facet):
         newMeanTrials.plot(ylim=(yMin, yMax), xlim=(freqMin, freqMax),subplots=True)
         plt.xlabel('frequency (Hz)')
-        plt.xticks([4, 7, 13, 26])
+        plt.xticks(xticks)
     else:
         plt.figure()
         plt.plot(newMeanTrials, linewidth=0.5)
         if (freqMin is not None):
+            print freqMin
             plt.xlim(left=freqMin)
         if (freqMax is not None):
             plt.xlim(right=freqMax)
@@ -1253,12 +1255,13 @@ def plotFFT(data, facet=False, freqMin=None, freqMax=None, yMin=None,
             plt.ylim(top=yMax)
         # plt.legend(data.columns, bbox_to_anchor=(1, 1), ncol=4)
         plt.xlabel('frequency (Hz)')
-        plt.xticks([4, 7, 13, 26])
+        plt.xticks(xticks)
         # plt.show()
 
 def plotFFTElectrodes(data, trialNumList, events, trialDur, fs,
     baselineDur=0.1, electrodes='Fp1', normalize=False, facet=False,
-    freqMin=None, freqMax=None, yMin=None, yMax=None, startOffset=0, noiseAve=None):
+    freqMin=None, freqMax=None, yMin=None, yMax=None, startOffset=0,
+    noiseAve=None, averageTimeFirst=False):
     """
     Plot the FFT of each electrode as single lines on the same figure with or
     without facetting. The FFT is computed from the ERP (average across trials
@@ -1295,6 +1298,9 @@ def plotFFTElectrodes(data, trialNumList, events, trialDur, fs,
         Minimum value (y-axis) to show on the plot.
     yMax : float, default to None
         Maximum value (y-axis) to show on the plot.
+    averageTimeFirst : bool, default to False
+        If True: average data in the time domain and then do the FFT.
+        If False: do the FFT for each trial and then average in the frequency domain
 
     Returns:
 
@@ -1305,12 +1311,28 @@ def plotFFTElectrodes(data, trialNumList, events, trialDur, fs,
     print 'Average of %d trials' % len(trialNumList)
     allTrials = pd.DataFrame()
     baselineDurSamples = int(np.round(baselineDur))
-    for electrode in electrodes:
-        meanDataElectrode, allTrialsElectrode = getTrialsAverage(data=data[electrode], events=events,
-            trialDur=trialDur, trialNumList=trialNumList, baselineDur=baselineDur,
-            normalize=normalize, fs=fs, startOffset=startOffset)
-        Y = fftpack.fft(meanDataElectrode[baselineDurSamples:])
-        allTrials[electrode] = pd.Series(np.abs(Y))
+    if averageTimeFirst:
+        for electrode in electrodes:
+            allY = pd.DataFrame()
+            for trialNum in trialNumList:
+                trialData = getTrialData(data[electrode], events=events, trialNum=trialNum,
+                    baselineDur=baselineDur, trialDur=trialDur, fs=fs,
+                    startOffset=startOffset)
+                if normalize:
+                    trialData = normalizeFromBaseline(trialData,
+                        baselineDur=baselineDur, fs=fs)
+
+            trialData = trialData.reset_index(drop=True)
+
+            allY[trialNum] = fftpack.fft(trialData[baselineDurSamples:])
+            allTrials[electrode] = pd.Series(allY.mean(axis=1))
+    else:
+        for electrode in electrodes:
+            meanDataElectrode, allTrialsElectrode = getTrialsAverage(data=data[electrode], events=events,
+                trialDur=trialDur, trialNumList=trialNumList, baselineDur=baselineDur,
+                normalize=normalize, fs=fs, startOffset=startOffset)
+            Y = fftpack.fft(meanDataElectrode[baselineDurSamples:])
+            allTrials[electrode] = pd.Series(np.abs(Y))
 
     plotFFT(allTrials, facet=facet, freqMin=freqMin, freqMax=freqMax,
         yMin=yMin, yMax=yMax, fs=fs)
