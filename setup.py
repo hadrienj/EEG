@@ -8,4 +8,13 @@ setup(name='EEG',
       author_email='hadrienjean@gmail.com',
       license='MIT',
       packages=['EEG'],
+      install_requires=[
+          'numpy',
+          'matplotlib',
+          'pandas',
+          'scipy',
+          'mne',
+          'couchdb',
+          'h5py'
+      ],
       zip_safe=False)
